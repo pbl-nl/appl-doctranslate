@@ -1,2 +1,1 @@
-# appl-doctranslate
-AI file translation
+# AI file translation
