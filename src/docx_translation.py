@@ -14,120 +14,6 @@ from openai import AzureOpenAI
 import utils
 
 
-def translate_docx_document(client: AzureOpenAI, model: str, input_path: str, target_language: str, output_folder: str, save_as_pdf: bool) -> bool:
-    """
-    Translate an entire DOCX document while preserving formatting.
-    
-    Args:
-        client: Azure OpenAI client
-        model: chosen Azure OpenAI model deployment
-        input_path: path to input .docx file
-        target_language: language to translate to
-        output_folder: output folder name
-        save_as_pdf: indicator to save as pdf
-
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        file_name = os.path.basename(input_path)
-        output_file_path = os.path.join(output_folder, target_language + "_" + file_name)
-        # Load the document
-        doc = Document(input_path)
-        
-        # Translate main document paragraphs
-        if doc.paragraphs:
-            texts = collect_paragraph_texts(doc.paragraphs)
-            
-            # Process in batches
-            batch_size = 20
-            translated_texts = []
-            
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
-                print(f"Processing batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}")
-                batch_translations = translate_text_batch(client=client,
-                                                          deployment_name=model,
-                                                          texts=batch,
-                                                          target_language=target_language)
-                translated_texts.extend(batch_translations)
-                
-                # Small delay between batches
-                if i + batch_size < len(texts):
-                    time.sleep(0.5)
-            
-            apply_translations_to_paragraphs(doc.paragraphs, translated_texts)
-        
-        # Translate tables
-        if doc.tables:
-            print("Translating tables...")
-            for table_idx, table in enumerate(doc.tables):
-                print(f"Processing table {table_idx+1}/{len(doc.tables)}")
-                translate_table_cells(client=client,
-                                      model=model,
-                                      table=table,
-                                      target_language=target_language)
-        
-        # Translate headers and footers
-        print("Translating headers and footers...")
-        for section_idx, section in enumerate(doc.sections):
-            print(f"  Processing section {section_idx+1}/{len(doc.sections)}")
-            
-            # Translate header
-            if section.header and section.header.paragraphs:
-                header_texts = collect_paragraph_texts(section.header.paragraphs)
-                header_translations = translate_text_batch(client=client,
-                                                           deployment_name=model,
-                                                           texts=header_texts,
-                                                           target_language=target_language)
-                apply_translations_to_paragraphs(section.header.paragraphs, header_translations)
-                
-                # Translate header tables
-                for table in section.header.tables:
-                    translate_table_cells(client=client,
-                                          model=model,
-                                          table=table,
-                                          target_language=target_language)
-            
-            # Translate footer
-            if section.footer and section.footer.paragraphs:
-                footer_texts = collect_paragraph_texts(section.footer.paragraphs)
-                footer_translations = translate_text_batch(client=client,
-                                                           deployment_name=model,
-                                                           texts=footer_texts,
-                                                           target_language=target_language)
-                apply_translations_to_paragraphs(section.footer.paragraphs, footer_translations)
-                
-                # Translate footer tables
-                for table in section.footer.tables:
-                    translate_table_cells(client=client,
-                                          model=model,
-                                          table=table,
-                                          target_language=target_language)
-        
-        # Save the translated document
-        print(f"Saving translated document: {output_file_path}")
-        doc.save(output_file_path)
-
-        # if indicated, save as pdf file
-        if save_as_pdf:
-            pdf_file_name = os.path.splitext(file_name)[0] + ".pdf"
-            pdf_file_path = os.path.join(output_folder, target_language + "_" + pdf_file_name)
-            utils.convert_docx_to_pdf(output_file_path, pdf_file_path)
-            # add watermark to created pdf file
-            utils.add_watermark(pdf_file_path, pdf_file_path, "X:/User/troosts/projects/translator/watermark.pdf")
-            # remove converted .docx file
-            os.remove(output_file_path)
-
-        return True
-        
-    except Exception as e:
-        print(f"Error processing document: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
 def translate_text_batch(client: AzureOpenAI, deployment_name: str, texts: List[str], target_language: str) -> List[str]:
     """
     Translate multiple text strings in a single API call for efficiency.
@@ -328,3 +214,117 @@ def translate_table_cells(client: AzureOpenAI, model: str, table, target_languag
     
     # Apply translations
     apply_translations_to_paragraphs(all_paragraphs, translated_texts)
+
+
+def translate_docx_document(client: AzureOpenAI, model: str, input_path: str, target_language: str, output_folder: str, save_as_pdf: bool) -> bool:
+    """
+    Translate an entire DOCX document while preserving formatting.
+    
+    Args:
+        client: Azure OpenAI client
+        model: chosen Azure OpenAI model deployment
+        input_path: path to input .docx file
+        target_language: language to translate to
+        output_folder: output folder name
+        save_as_pdf: indicator to save as pdf
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        file_name = os.path.basename(input_path)
+        output_file_path = os.path.join(output_folder, target_language + "_" + file_name)
+        # Load the document
+        doc = Document(input_path)
+        
+        # Translate main document paragraphs
+        if doc.paragraphs:
+            texts = collect_paragraph_texts(doc.paragraphs)
+            
+            # Process in batches
+            batch_size = 20
+            translated_texts = []
+            
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i:i + batch_size]
+                print(f"Processing batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}")
+                batch_translations = translate_text_batch(client=client,
+                                                          deployment_name=model,
+                                                          texts=batch,
+                                                          target_language=target_language)
+                translated_texts.extend(batch_translations)
+                
+                # Small delay between batches
+                if i + batch_size < len(texts):
+                    time.sleep(0.5)
+            
+            apply_translations_to_paragraphs(doc.paragraphs, translated_texts)
+        
+        # Translate tables
+        if doc.tables:
+            print("Translating tables...")
+            for table_idx, table in enumerate(doc.tables):
+                print(f"Processing table {table_idx+1}/{len(doc.tables)}")
+                translate_table_cells(client=client,
+                                      model=model,
+                                      table=table,
+                                      target_language=target_language)
+        
+        # Translate headers and footers
+        print("Translating headers and footers...")
+        for section_idx, section in enumerate(doc.sections):
+            print(f"  Processing section {section_idx+1}/{len(doc.sections)}")
+            
+            # Translate header
+            if section.header and section.header.paragraphs:
+                header_texts = collect_paragraph_texts(section.header.paragraphs)
+                header_translations = translate_text_batch(client=client,
+                                                           deployment_name=model,
+                                                           texts=header_texts,
+                                                           target_language=target_language)
+                apply_translations_to_paragraphs(section.header.paragraphs, header_translations)
+                
+                # Translate header tables
+                for table in section.header.tables:
+                    translate_table_cells(client=client,
+                                          model=model,
+                                          table=table,
+                                          target_language=target_language)
+            
+            # Translate footer
+            if section.footer and section.footer.paragraphs:
+                footer_texts = collect_paragraph_texts(section.footer.paragraphs)
+                footer_translations = translate_text_batch(client=client,
+                                                           deployment_name=model,
+                                                           texts=footer_texts,
+                                                           target_language=target_language)
+                apply_translations_to_paragraphs(section.footer.paragraphs, footer_translations)
+                
+                # Translate footer tables
+                for table in section.footer.tables:
+                    translate_table_cells(client=client,
+                                          model=model,
+                                          table=table,
+                                          target_language=target_language)
+        
+        # Save the translated document
+        print(f"Saving translated document: {output_file_path}")
+        doc.save(output_file_path)
+
+        # if indicated, save as pdf file
+        if save_as_pdf:
+            pdf_file_name = os.path.splitext(file_name)[0] + ".pdf"
+            pdf_file_path = os.path.join(output_folder, target_language + "_" + pdf_file_name)
+            utils.convert_docx_to_pdf(output_file_path, pdf_file_path)
+            # add watermark to created pdf file
+            utils.add_watermark(pdf_file_path, pdf_file_path, "X:/User/troosts/projects/translator/watermark.pdf")
+            # remove converted .docx file
+            os.remove(output_file_path)
+
+        return True
+        
+    except Exception as e:
+        print(f"Error processing document: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
