@@ -9,7 +9,6 @@ import os
 import pymupdf
 from openai import AzureOpenAI
 import utils
-from pathlib import Path
 
 
 def translate_text(client: AzureOpenAI, model: str, text: str, target_language: str) -> str:

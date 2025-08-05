@@ -221,10 +221,12 @@ def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, tar
     Translate a text file while preserving formatting.
     
     Args:
+        client: AzureOpenAI client
+        model: Azure OpenAI model
         input_path: Path to input .txt file
-        output_path: Path to output .txt file
-        target_lang: Target language
-        source_lang: Source language
+        target_language: Target language
+        output_folder: folder for output file
+        save_as_pdf: Indicator to save resulting file as pdf
         
     Returns:
         True if successful, False otherwise
@@ -281,7 +283,7 @@ def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, tar
             utils.convert_txt_to_pdf(output_file_path, pdf_file_path)
             # add watermark to created pdf file
             utils.add_watermark(pdf_file_path, pdf_file_path, "X:/User/troosts/projects/translator/watermark.pdf")
-            # remove converted .docx file
+            # remove converted .txt file
             os.remove(output_file_path)
 
         print(f"Translated text length: {len(translated_text)} characters")
@@ -292,114 +294,3 @@ def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, tar
         import traceback
         traceback.print_exc()
         return False
-
-
-def preview_structure(input_path: str, max_lines: int = 20):
-    """
-    Preview the structure analysis of a text file.
-    
-    Args:
-        input_path: Path to input .txt file
-        max_lines: Maximum number of lines to preview
-    """
-    try:
-        encoding = detect_encoding(input_path)
-        
-        with open(input_path, 'r', encoding=encoding, errors='replace') as f:
-            text = f.read()
-        
-        structures = parse_text_structure(text)
-        
-        print(f"\nStructure Preview (first {max_lines} lines):")
-        print("-" * 60)
-        
-        for i, struct in enumerate(structures[:max_lines]):
-            if struct['is_empty']:
-                print(f"Line {i+1:3d}: [EMPTY] '{struct['leading_whitespace']}'")
-            else:
-                leading_repr = repr(struct['leading_whitespace']) if struct['leading_whitespace'] else "''"
-                trailing_repr = repr(struct['trailing_whitespace']) if struct['trailing_whitespace'] else "''"
-                content_preview = struct['content'][:50] + "..." if len(struct['content']) > 50 else struct['content']
-                print(f"Line {i+1:3d}: Leading:{leading_repr} Content:'{content_preview}' Trailing:{trailing_repr}")
-        
-        if len(structures) > max_lines:
-            print(f"... and {len(structures) - max_lines} more lines")
-            
-    except Exception as e:
-        print(f"Error previewing structure: {e}")
-
-
-# def main():
-#     parser = argparse.ArgumentParser(
-#         description="Translate TXT files using Azure OpenAI while preserving formatting"
-#     )
-#     parser.add_argument(
-#         "input_file", 
-#         help="Input .txt file path"
-#     )
-#     parser.add_argument(
-#         "output_file", 
-#         nargs='?',
-#         help="Output .txt file path (optional for preview mode)"
-#     )
-#     parser.add_argument(
-#         "--source-lang", 
-#         default="auto",
-#         help="Source language (default: auto-detect)"
-#     )
-#     parser.add_argument(
-#         "--target-lang", 
-#         default="Spanish",
-#         help="Target language (default: Spanish). Use full language names."
-#     )
-#     parser.add_argument(
-#         "--preview", 
-#         action="store_true",
-#         help="Preview the text structure analysis without translating"
-#     )
-#     parser.add_argument(
-#         "--preview-lines", 
-#         type=int, 
-#         default=20,
-#         help="Number of lines to show in preview mode (default: 20)"
-#     )
-    
-#     args = parser.parse_args()
-    
-#     # Validate input file
-#     if not Path(args.input_file).exists():
-#         print(f"Error: Input file '{args.input_file}' not found.")
-#         sys.exit(1)
-    
-#     # Preview mode
-#     if args.preview:
-#         print(f"Previewing structure of: {args.input_file}")
-#         preview_structure(args.input_file, args.preview_lines)
-#         return
-    
-#     # Translation mode
-#     if not args.output_file:
-#         print("Error: Output file is required for translation mode.")
-#         print("Use --preview flag to preview structure without translating.")
-#         sys.exit(1)
-    
-#     # Create output directory if it doesn't exist
-#     output_path = Path(args.output_file)
-#     output_path.parent.mkdir(parents=True, exist_ok=True)
-    
-#     print(f"Translating from '{args.source_lang}' to '{args.target_lang}' using Azure OpenAI")
-#     print(f"Input: {args.input_file}")
-#     print(f"Output: {args.output_file}")
-    
-#     success = translate_file(args.input_file, args.output_file, args.target_lang, args.source_lang)
-    
-#     if success:
-#         print(f"✅ Translation completed successfully!")
-#         print(f"📄 Output saved to: {args.output_file}")
-#     else:
-#         print("❌ Translation failed. Please check the error messages above.")
-#         sys.exit(1)
-
-
-# if __name__ == "__main__":
-#     main()
