@@ -6,6 +6,7 @@ from reportlab.platypus import SimpleDocTemplate, Preformatted
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import comtypes.client
 
+
 def create_watermark(watermark_text, output_file):
     c = canvas.Canvas(output_file)
     c.setFont("Helvetica", 40) # Font type and font size
@@ -16,6 +17,7 @@ def create_watermark(watermark_text, output_file):
     c.drawString(0, 0, watermark_text)  # Draw text at the new origin
     c.restoreState()
     c.save()
+
 
 def add_watermark(input_pdf_path, output_pdf_path, watermark_pdf_path):
     # Read the watermark PDF
