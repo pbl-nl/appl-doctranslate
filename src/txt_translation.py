@@ -282,7 +282,8 @@ def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, tar
             pdf_file_path = os.path.join(output_folder, target_language + "_" + pdf_file_name)
             utils.convert_txt_to_pdf(output_file_path, pdf_file_path)
             # add watermark to created pdf file
-            utils.add_watermark(pdf_file_path, pdf_file_path, "X:/User/troosts/projects/translator/watermark.pdf")
+            watermark_file_path = os.path.abspath(os.path.join(os.getcwd(), "watermark.pdf"))
+            utils.add_watermark(pdf_file_path, pdf_file_path, watermark_file_path)
             # remove converted .txt file
             os.remove(output_file_path)
 

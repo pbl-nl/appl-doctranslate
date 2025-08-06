@@ -75,8 +75,6 @@ def translate_pdf_document(client: AzureOpenAI, model: str, input_path: str, tar
         ocg_xref = doc.add_ocg("translation", on=True)
         # Iterate over all pages
         for i, page in enumerate(doc.pages()):
-            status_text = f"Translating page {i} of file {file_name}..."
-            # yield status_text
             # Extract text grouped like lines in a paragraph.
             blocks = page.get_text("blocks", flags=textflags)
             # Every block of text is contained in a rectangle ("bbox")
@@ -97,7 +95,12 @@ def translate_pdf_document(client: AzureOpenAI, model: str, input_path: str, tar
         # save file to output folder and add watermark
         doc.ez_save(output_file_path)
         doc.close()
-        utils.add_watermark(output_file_path, output_file_path, "X:/User/troosts/projects/translator/watermark.pdf")
+
+        # add watermark
+        current_directory = os.getcwd()
+        parent_directory = os.path.dirname(current_directory)
+        watermark_file_path = os.path.join(parent_directory, "watermark.pdf")
+        utils.add_watermark(output_file_path, output_file_path, watermark_file_path)
 
         return True
         
