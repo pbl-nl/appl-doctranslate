@@ -2,6 +2,8 @@
 inspired by:
 - https://medium.com/@pymupdf/translating-pdfs-a-practical-pymupdf-guide-c1c54b024042
 - https://www.gradio.app/
+
+Code generation supported by Claude
 """
 import gradio as gr
 import os
@@ -9,6 +11,7 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 # local imports
 import utils
+import settings
 import txt_translation
 import docx_translation
 import pdf_translation
@@ -61,7 +64,7 @@ def process_translation(file_list, input_folder, target_language, save_as_pdf, p
 
             if file_extension == ".txt":
                 txt_translation.translate_txt_document(client=client,
-                                                       model=DEPLOYMENT_NAME,
+                                                       model=AZURE_DEPLOYMENT_NAME,
                                                        input_path=file_path,
                                                        target_language=target_language,
                                                        output_folder=output_folder,
@@ -69,7 +72,7 @@ def process_translation(file_list, input_folder, target_language, save_as_pdf, p
             elif file_extension == ".docx":
                 # print(f"Translating Word document: {file_name} to {target_language}")
                 docx_translation.translate_docx_document(client=client,
-                                                         model=DEPLOYMENT_NAME,
+                                                         model=AZURE_DEPLOYMENT_NAME,
                                                          input_path=file_path,
                                                          target_language=target_language,
                                                          output_folder=output_folder,
@@ -77,7 +80,7 @@ def process_translation(file_list, input_folder, target_language, save_as_pdf, p
             elif file_extension == ".pdf":
                 # print(f"Translating PDF document: {file_name} to {target_language}")
                 pdf_translation.translate_pdf_document(client=client,
-                                                       model=DEPLOYMENT_NAME,
+                                                       model=AZURE_DEPLOYMENT_NAME,
                                                        input_path=file_path,
                                                        target_language=target_language,
                                                        output_path=output_folder)
@@ -95,17 +98,17 @@ def process_translation(file_list, input_folder, target_language, save_as_pdf, p
 load_dotenv(dotenv_path="Y:/Kennisbasis/Datascience/ChatPBLenv/.env")
 
 # Configure Azure OpenAI
-AZURE_OPENAI_ENDPOINT = "https://pbl-openai-a-ca.openai.azure.com/"
+AZURE_OPENAI_ENDPOINT = settings.AZURE_OPENAI_ENDPOINT
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-AZURE_OPENAI_VERSION = "2024-05-01-preview"
-DEPLOYMENT_NAME = "pbl-openai-a-cd-openai4o"
+AZURE_OPENAI_VERSION = settings.AZURE_OPENAI_API_VERSION
+AZURE_DEPLOYMENT_NAME = settings.AZURE_DEPLOYMENT_NAME
 
 # Initialize Azure OpenAI client
 client = AzureOpenAI(
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY,
     api_version=AZURE_OPENAI_VERSION,
-    azure_deployment=DEPLOYMENT_NAME
+    azure_deployment=AZURE_DEPLOYMENT_NAME
 )
 
 # Language options

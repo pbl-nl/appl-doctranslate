@@ -95,11 +95,8 @@ def translate_pdf_document(client: AzureOpenAI, model: str, input_path: str, tar
         # save file to output folder and add watermark
         doc.ez_save(output_file_path)
         doc.close()
-
         # add watermark
-        current_directory = os.getcwd()
-        parent_directory = os.path.dirname(current_directory)
-        watermark_file_path = os.path.join(parent_directory, "watermark.pdf")
+        watermark_file_path = os.path.abspath(os.path.join(os.getcwd(), "watermark.pdf"))
         utils.add_watermark(output_file_path, output_file_path, watermark_file_path)
 
         return True
