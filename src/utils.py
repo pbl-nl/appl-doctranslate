@@ -5,6 +5,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Preformatted
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import comtypes.client
+from pdf2docx import Converter
 
 
 def create_watermark(watermark_text, output_file):
@@ -162,3 +163,40 @@ def convert_docx_to_pdf(docx_file: str, pdf_file: str) -> bool:
     finally:
         # Always uninitialize COM
         comtypes.CoUninitialize()
+
+def convert_pdf_to_docx(pdf_path: str, docx_path: str) -> bool:
+    """
+    Convert PDF to DOCX using pdf2docx library.
+    This method preserves most formatting including:
+    - Text, paragraphs, headings
+    - Basic layouts, tables
+    - Images (may vary based on PDF complexity)
+    
+    Args:
+        pdf_path: file path of pdf file
+        docx_path: file path of docx file
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Create a Converter object
+        cv = Converter(pdf_path)
+        
+        # Convert PDF to DOCX
+        cv.convert(docx_path, start=0, end=None)
+        
+        # Close the converter
+        cv.close()
+        
+        # Verify conversion
+        if os.path.exists(docx_path) and os.path.getsize(docx_path) > 0:
+            print(f"✓ PDF to DOCX conversion completed: {docx_path}")
+            return True
+        else:
+            print("✗ DOCX conversion failed")
+            return False
+            
+    except Exception as e:
+        print(f"✗ Error during PDF to DOCX conversion: {e}")
+        return False

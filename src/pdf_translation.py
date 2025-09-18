@@ -50,17 +50,24 @@ def translate_text(client: AzureOpenAI, model: str, text: str, target_language: 
         return f"Translation error: {str(e)}"
 
 
-def translate_pdf_document(client: AzureOpenAI, model: str, input_path: str, target_language: str, output_path: str) -> bool:
+def translate_pdf_document(client: AzureOpenAI,
+                           model: str,
+                           input_path: str,
+                           target_language: str,
+                           output_path: str,
+                           output_format: str) -> None:
     """
     Translate an entire pdf document while preserving formatting.
     
     Args:
+        client: Azure OpenAI client
+        model: chosen Azure OpenAI model deployment
+        target_language: Target language for translation
         input_path: Path to input .pdf file
         output_path: Path to output .pdf file
-        
-    Returns:
-        True if successful, False otherwise
+        output_format: chosen output format
     """
+    translated_texts = ""
     try:
         file_name = os.path.basename(input_path)
         output_file_path = os.path.join(output_path, target_language + "_" + file_name)
@@ -85,26 +92,30 @@ def translate_pdf_document(client: AzureOpenAI, model: str, input_path: str, tar
                 block_text = block[4]
                 # Invoke the actual translation
                 translated_text = translate_text(client=client,
-                                                 model=model,
-                                                 text=block_text,
-                                                 target_language=target_language)
+                                                model=model,
+                                                text=block_text,
+                                                target_language=target_language)
+                translated_texts += "\n\n" + translated_text
                 # Cover the original text with a white rectangle.
                 page.draw_rect(bbox, color=None, fill=WHITE, oc=ocg_xref)
                 # Write the translated text into the rectangle
                 page.insert_htmlbox(bbox, translated_text, oc=ocg_xref)
-        # save file to output folder and add watermark
-        doc.ez_save(output_file_path)
-        doc.close()
-        # add watermark
-        watermark_file_path = os.path.abspath(os.path.join(os.getcwd(), "watermark.pdf"))
-        utils.add_watermark(output_file_path, output_file_path, watermark_file_path)
-
-        return True
-        
+        if output_format != "Save as plain text":
+            # save file to output folder and add watermark
+            doc.ez_save(output_file_path)
+            print(f"file translated from {input_path} to {output_file_path}")
+            doc.close()
+            # add watermark
+            watermark_file_path = os.path.abspath(os.path.join(os.getcwd(), "watermark.pdf"))
+            utils.add_watermark(output_file_path, output_file_path, watermark_file_path)
     except Exception as e:
         print(f"Error processing document: {e}")
         import traceback
         traceback.print_exc()
-        
-        return False
-
+    if output_format == "Save as plain text":
+        txt_file_name = os.path.splitext(file_name)[0] + ".txt"
+        output_file_path = os.path.join(output_path, target_language + "_" + txt_file_name)
+        # Save translated text as a plain text file
+        output_encoding = 'utf-8'  # Always save as UTF-8 for best compatibility
+        with open(output_file_path, 'w', encoding=output_encoding, newline='') as f:
+            f.write(translated_texts)

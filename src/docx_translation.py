@@ -132,8 +132,11 @@ def apply_translations_to_paragraphs(paragraphs, translations: List[str]):
             
         # Store original formatting from first meaningful run
         original_formatting = None
+        print(f"paragraph.runs = {paragraph.runs}")
         for run in paragraph.runs:
+            print(f"run = {run}")
             if run.text.strip():
+                print(f"run.text.strip() = {run.text.strip()}")
                 original_formatting = {
                     'bold': run.bold,
                     'italic': run.italic,
@@ -142,7 +145,9 @@ def apply_translations_to_paragraphs(paragraphs, translations: List[str]):
                     'font_size': run.font.size,
                     'font_color': run.font.color.rgb if run.font.color.rgb else None,
                     'highlight_color': run.font.highlight_color,
+                    'style': run.style
                 }
+                print(f"original_formatting = {original_formatting}")
                 break
         
         # Clear existing runs
@@ -174,6 +179,8 @@ def apply_translations_to_paragraphs(paragraphs, translations: List[str]):
                     first_run.font.color.rgb = original_formatting['font_color']
                 if original_formatting['highlight_color']:
                     first_run.font.highlight_color = original_formatting['highlight_color']
+                if original_formatting['style']:
+                    first_run.style = original_formatting['style']
 
 
 def translate_table_cells(client: AzureOpenAI, model: str, table, target_language: str):
@@ -216,7 +223,12 @@ def translate_table_cells(client: AzureOpenAI, model: str, table, target_languag
     apply_translations_to_paragraphs(all_paragraphs, translated_texts)
 
 
-def translate_docx_document(client: AzureOpenAI, model: str, input_path: str, target_language: str, output_folder: str, save_as_pdf: bool) -> bool:
+def translate_docx_document(client: AzureOpenAI,
+                            model: str,
+                            input_path: str,
+                            target_language: str,
+                            output_folder: str,
+                            output_format: str) -> bool:
     """
     Translate an entire DOCX document while preserving formatting.
     
@@ -226,7 +238,7 @@ def translate_docx_document(client: AzureOpenAI, model: str, input_path: str, ta
         input_path: path to input .docx file
         target_language: language to translate to
         output_folder: output folder name
-        save_as_pdf: indicator to save as pdf
+        output_format: chosen output format
 
     Returns:
         True if successful, False otherwise
@@ -273,7 +285,7 @@ def translate_docx_document(client: AzureOpenAI, model: str, input_path: str, ta
         # Translate headers and footers
         print("Translating headers and footers...")
         for section_idx, section in enumerate(doc.sections):
-            print(f"  Processing section {section_idx+1}/{len(doc.sections)}")
+            print(f"Processing section {section_idx+1}/{len(doc.sections)}")
             
             # Translate header
             if section.header and section.header.paragraphs:
@@ -307,12 +319,8 @@ def translate_docx_document(client: AzureOpenAI, model: str, input_path: str, ta
                                           table=table,
                                           target_language=target_language)
         
-        # Save the translated document
-        print(f"Saving translated document: {output_file_path}")
-        doc.save(output_file_path)
-
         # if indicated, save as pdf file
-        if save_as_pdf:
+        if output_format == "Save as PDF":
             pdf_file_name = os.path.splitext(file_name)[0] + ".pdf"
             pdf_file_path = os.path.join(output_folder, target_language + "_" + pdf_file_name)
             utils.convert_docx_to_pdf(output_file_path, pdf_file_path)
@@ -321,6 +329,17 @@ def translate_docx_document(client: AzureOpenAI, model: str, input_path: str, ta
             utils.add_watermark(pdf_file_path, pdf_file_path, watermark_file_path)
             # remove converted .docx file
             os.remove(output_file_path)
+        elif output_format == "Save as plain text":
+            # Convert to plain text file
+            txt_file_name = os.path.splitext(file_name)[0] + ".txt"
+            txt_file_path = os.path.join(output_folder, target_language + "_" + txt_file_name)
+            # utils.convert_docx_to_txt(output_file_path, txt_file_path)
+            # remove converted .docx file
+            os.remove(output_file_path)
+        else:
+            # Save the translated document
+            print(f"Saving translated document: {output_file_path}")
+            doc.save(output_file_path)
 
         return True
         

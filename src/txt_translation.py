@@ -216,7 +216,12 @@ def reconstruct_text(structures: List[Dict]) -> str:
     return '\n'.join(lines)
 
 
-def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, target_language: str, output_folder: str, save_as_pdf: bool) -> bool:
+def translate_txt_document(client: AzureOpenAI,
+                           model: str,
+                           input_path: str,
+                           target_language: str,
+                           output_folder: str,
+                           output_format: str) -> bool:
     """
     Translate a text file while preserving formatting.
     
@@ -226,8 +231,8 @@ def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, tar
         input_path: Path to input .txt file
         target_language: Target language
         output_folder: folder for output file
-        save_as_pdf: Indicator to save resulting file as pdf
-        
+        output_format: chosen output format
+
     Returns:
         True if successful, False otherwise
     """
@@ -271,13 +276,8 @@ def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, tar
         print("Reconstructing translated text...")
         translated_text = reconstruct_text(structures)
         
-        # Save translated file
-        output_encoding = 'utf-8'  # Always save as UTF-8 for best compatibility
-        with open(output_file_path, 'w', encoding=output_encoding, newline='') as f:
-            f.write(translated_text)
-        
-        # if indicated, save as pdf file
-        if save_as_pdf:
+        # if chosen, save as pdf file
+        if output_format == "Save as PDF":
             pdf_file_name = os.path.splitext(file_name)[0] + ".pdf"
             pdf_file_path = os.path.join(output_folder, target_language + "_" + pdf_file_name)
             utils.convert_txt_to_pdf(output_file_path, pdf_file_path)
@@ -286,6 +286,11 @@ def translate_txt_document(client: AzureOpenAI, model: str, input_path: str, tar
             utils.add_watermark(pdf_file_path, pdf_file_path, watermark_file_path)
             # remove converted .txt file
             os.remove(output_file_path)
+        else:
+            # Save translated text as a plain text file
+            output_encoding = 'utf-8'  # Always save as UTF-8 for best compatibility
+            with open(output_file_path, 'w', encoding=output_encoding, newline='') as f:
+                f.write(translated_text)
 
         print(f"Translated text length: {len(translated_text)} characters")
         return True
