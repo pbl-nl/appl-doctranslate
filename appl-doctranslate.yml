@@ -30,12 +30,15 @@ dependencies:
       - colorama==0.4.6
       - comtypes==1.4.11
       - distro==1.9.0
+      - docx2pdf==0.1.8
       - docxcompose==1.4.0
       - docxtpl==0.20.1
       - exceptiongroup==1.3.0
       - fastapi==0.116.1
       - ffmpy==0.6.1
       - filelock==3.18.0
+      - fire==0.7.1
+      - fonttools==4.59.2
       - fsspec==2025.7.0
       - gradio==5.38.2
       - gradio-client==1.11.0
@@ -53,9 +56,11 @@ dependencies:
       - mdurl==0.1.2
       - numpy==2.2.6
       - openai==1.97.1
+      - opencv-python-headless==4.12.0.88
       - orjson==3.11.1
       - packaging==25.0
       - pandas==2.3.1
+      - pdf2docx==0.5.8
       - pillow==11.3.0
       - pydantic==2.11.7
       - pydantic-core==2.33.2
@@ -68,6 +73,7 @@ dependencies:
       - python-dotenv==1.1.1
       - python-multipart==0.0.20
       - pytz==2025.2
+      - pywin32==311
       - pyyaml==6.0.2
       - reportlab==4.4.3
       - requests==2.32.4
@@ -79,6 +85,7 @@ dependencies:
       - six==1.17.0
       - sniffio==1.3.1
       - starlette==0.47.2
+      - termcolor==3.1.0
       - tomlkit==0.13.3
       - tqdm==4.67.1
       - typer==0.16.0
@@ -88,4 +95,4 @@ dependencies:
       - urllib3==2.5.0
       - uvicorn==0.35.0
       - websockets==15.0.1
-
+prefix: F:\User\troosts\conda\envs\appl-doctranslate

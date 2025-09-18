@@ -1,3 +1,4 @@
+# filepath: x:\User\troosts\projects\appl-doctranslate\src\app.py
 """
 inspired by:
 - https://medium.com/@pymupdf/translating-pdfs-a-practical-pymupdf-guide-c1c54b024042
@@ -9,6 +10,7 @@ import gradio as gr
 import os
 from openai import AzureOpenAI
 from dotenv import load_dotenv
+from docx2pdf import convert
 # local imports
 import utils
 import settings
@@ -30,7 +32,7 @@ def list_files_in_directory(directory_path):
         return gr.Dropdown(choices=[str(e)])
 
 
-def process_translation(file_list, input_folder, target_language, save_as_pdf, progress=gr.Progress()):
+def process_translation(file_list, input_folder, target_language, output_format, progress=gr.Progress()):
     """
     Main processing function
     """
@@ -54,13 +56,14 @@ def process_translation(file_list, input_folder, target_language, save_as_pdf, p
 
         # translation loop over all selected files
         for i, file_name in enumerate(file_list):
-            print(i, file_name)
             file_path = os.path.join(input_folder, file_name)
             file_extension = os.path.splitext(file_path)[1].lower()
             status_message = f"Translating file {i+1}/{len(file_list)}: {file_name}"
-            print(status_message)
             progress(i/len(file_list), desc=status_message)
             yield status_message
+
+            save_as_pdf = output_format == "Save as PDF"
+            save_as_txt = output_format == "Save as plain text"
 
             if file_extension == ".txt":
                 txt_translation.translate_txt_document(client=client,
@@ -68,22 +71,22 @@ def process_translation(file_list, input_folder, target_language, save_as_pdf, p
                                                        input_path=file_path,
                                                        target_language=target_language,
                                                        output_folder=output_folder,
-                                                       save_as_pdf=save_as_pdf)
+                                                       output_format=output_format)
             elif file_extension == ".docx":
-                # print(f"Translating Word document: {file_name} to {target_language}")
                 docx_translation.translate_docx_document(client=client,
                                                          model=AZURE_DEPLOYMENT_NAME,
                                                          input_path=file_path,
                                                          target_language=target_language,
                                                          output_folder=output_folder,
-                                                         save_as_pdf=save_as_pdf)
+                                                         output_format=output_format)
             elif file_extension == ".pdf":
-                # print(f"Translating PDF document: {file_name} to {target_language}")
                 pdf_translation.translate_pdf_document(client=client,
                                                        model=AZURE_DEPLOYMENT_NAME,
                                                        input_path=file_path,
                                                        target_language=target_language,
-                                                       output_path=output_folder)
+                                                       output_path=output_folder,
+                                                       output_format=output_format)
+                
             completed_message = f"Translation completed for {file_name}.\n"
             yield completed_message
 
@@ -131,11 +134,11 @@ with gr.Blocks(title="File Translation Tool", theme="soft") as demo:
     1. **Enter a folder path**. Copy-paste a file path from Windows File Explorer
     2. **Select one or more files to translate**: Supported file extensions are: .pdf, .docx, and .txt
     2. **Select target language** from the drop-down list of languages
-    3. **Choose output format**: Check "Save as PDF" for PDF output (with watermark), otherwise saves in original format
+    3. **Choose output format**: Select an option for output format (PDF, plain text, or original format)
     4. **Click "Translate Document"**: Translated files are written to subfolder "translations"
     NB: Formatting is preserved as much as possible, but not always possible. Text in images will not be translated.
     """)
-    
+
     with gr.Row():
         with gr.Column():
             status_state = gr.State("")
@@ -153,13 +156,14 @@ with gr.Blocks(title="File Translation Tool", theme="soft") as demo:
                 value="Dutch",
                 interactive=True
             )
-            
-            # PDF save option
-            save_pdf_checkbox = gr.Checkbox(
-                label="Save as PDF",
-                value=False
+
+            # Radio button for output format
+            output_format_radio = gr.Radio(
+                choices=["Save as PDF", "Save as plain text", "Save in original format"],
+                label="Choose output format",
+                value="Save in original format"
             )
-            
+
             # Process button
             process_button = gr.Button(
                 value="Translate Document",
@@ -180,7 +184,7 @@ with gr.Blocks(title="File Translation Tool", theme="soft") as demo:
     # Setup event handler: on click, selected files are being translated
     process_button.click(
         fn=process_translation,
-        inputs=[file_list, input_folder, language_dropdown, save_pdf_checkbox],
+        inputs=[file_list, input_folder, language_dropdown, output_format_radio],
         outputs=status_output
     )
 
