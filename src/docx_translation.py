@@ -6,6 +6,7 @@ while preserving all formatting, fonts, and layout, then outputs a new translate
 
 """
 import os
+import re
 import time
 from typing import List
 from docx import Document
@@ -17,19 +18,19 @@ import utils
 def translate_text_batch(client: AzureOpenAI, deployment_name: str, texts: List[str], target_language: str) -> List[str]:
     """
     Translate multiple text strings in a single API call for efficiency.
-    
+
     Args:
         client: Azure OpenAI client
         deployment_name: Azure OpenAI deployment name
         texts: List of texts to translate
         target_language: Target language
-        
+
     Returns:
         List of translated texts
     """
     if not texts or all(not text.strip() for text in texts):
         return texts
-    
+
     # Filter out empty texts but keep track of their positions
     text_map = {}
     non_empty_texts = []
@@ -37,107 +38,149 @@ def translate_text_batch(client: AzureOpenAI, deployment_name: str, texts: List[
         if text.strip():
             text_map[len(non_empty_texts)] = i
             non_empty_texts.append(text)
-    
+
     if not non_empty_texts:
         return texts
-    
-    prompt = f"""Translate the following texts to {target_language}. 
-    Preserve the exact meaning and tone. Maintain any formatting markers or special characters.
-    Return only the translations, separated by "---TRANSLATION_SEPARATOR---", in the same order as provided.
 
-    Texts to translate:
-    """
+    prompt = f"""Translate each <text> element below to {target_language}.
+Preserve the exact meaning, tone, and any special characters.
+Preserve any inline <i>...</i> and <b>...</b> markup tags within the text content.
+Return ONLY the translated text for each element using the identical tag structure:
+<text id="1">translation here</text>
+<text id="2">translation here</text>
+Do not add any text outside the tags.
+
+Texts to translate:
+"""
     for i, text in enumerate(non_empty_texts):
-        prompt += f"\n{i+1}. {text}"
-    
+        prompt += f'\n<text id="{i+1}">{text}</text>'
+
     try:
         response = client.chat.completions.create(
             model=deployment_name,
             messages=[
-                {"role": "system", "content": "You are a professional translator. Translate accurately while preserving formatting and meaning."},
+                {"role": "system", "content": "You are a professional translator. Translate accurately while preserving formatting and meaning. Keep any inline <i>...</i> and <b>...</b> markup tags in place around the translated words."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=4000,
             temperature=0
         )
-        
+
         translated_content = response.choices[0].message.content.strip()
-        
-        # Split the response by separator
-        if "---TRANSLATION_SEPARATOR---" in translated_content:
-            translated_parts = translated_content.split("---TRANSLATION_SEPARATOR---")
-        else:
-            # Fallback: split by numbered list if separator not used
-            translated_parts = []
-            lines = translated_content.split('\n')
-            current_translation = ""
-            
-            for line in lines:
-                line = line.strip()
-                if line and (line.startswith(f"{len(translated_parts)+1}.") or 
-                            line.startswith(f"{len(translated_parts)+1} ")):
-                    if current_translation:
-                        translated_parts.append(current_translation.strip())
-                    current_translation = line.split('.', 1)[1].strip() if '.' in line else line
-                else:
-                    current_translation += " " + line if current_translation and line else line
-            
-            if current_translation:
-                translated_parts.append(current_translation.strip())
-        
-        # Clean up translations and map back to original positions
+
+        # Parse <text id="N">...</text> tags
+        matches = re.findall(r'<text id="(\d+)">(.*?)</text>', translated_content, re.DOTALL)
+
         result = texts.copy()
-        for i, translation in enumerate(translated_parts[:len(non_empty_texts)]):
-            original_index = text_map[i]
-            result[original_index] = translation.strip()
-        
+        if matches:
+            for id_str, translation in matches:
+                idx = int(id_str) - 1
+                if 0 <= idx < len(non_empty_texts):
+                    original_index = text_map[idx]
+                    result[original_index] = translation.strip()
+        else:
+            # Last-resort fallback: old separator approach
+            if "---TRANSLATION_SEPARATOR---" in translated_content:
+                translated_parts = translated_content.split("---TRANSLATION_SEPARATOR---")
+                for i, translation in enumerate(translated_parts[:len(non_empty_texts)]):
+                    original_index = text_map[i]
+                    result[original_index] = translation.strip()
+
         return result
-        
+
     except Exception as e:
         print(f"Translation error: {e}")
         # Return original texts if translation fails
         return texts
 
 
+def _parse_inline_markup(text: str) -> List[tuple]:
+    """Split text containing <i>/<b> tags into (segment_text, fmt_dict) pairs."""
+    parts = re.split(r'(<[ib]>.*?</[ib]>)', text, flags=re.DOTALL)
+    segments = []
+    for part in parts:
+        if not part:
+            continue
+        m = re.match(r'<(i|b)>(.*?)</\1>', part, re.DOTALL)
+        if m:
+            tag, content = m.group(1), m.group(2)
+            segments.append((content, {'italic': True} if tag == 'i' else {'bold': True}))
+        else:
+            segments.append((part, {}))
+    return segments
+
+
+def _apply_run_formatting(run, base_fmt: dict, seg_fmt: dict):
+    """Apply base paragraph formatting plus per-segment overrides to a run."""
+    if base_fmt:
+        if base_fmt['font_name']:
+            run.font.name = base_fmt['font_name']
+        if base_fmt['font_size']:
+            run.font.size = base_fmt['font_size']
+        if base_fmt['font_color']:
+            run.font.color.rgb = base_fmt['font_color']
+        if base_fmt['highlight_color']:
+            run.font.highlight_color = base_fmt['highlight_color']
+        if base_fmt['style']:
+            run.style = base_fmt['style']
+        bold = seg_fmt.get('bold', base_fmt['bold'])
+        italic = seg_fmt.get('italic', base_fmt['italic'])
+        underline = seg_fmt.get('underline', base_fmt['underline'])
+    else:
+        bold = seg_fmt.get('bold')
+        italic = seg_fmt.get('italic')
+        underline = seg_fmt.get('underline')
+    if bold is not None:
+        run.bold = bold
+    if italic is not None:
+        run.italic = italic
+    if underline is not None:
+        run.underline = underline
+
+
 def collect_paragraph_texts(paragraphs) -> List[str]:
     """
-    Collect all text content from paragraphs.
-    
-    Args:
-        paragraphs: List of paragraph objects
-        
+    Collect text from paragraphs, encoding italic/bold runs as <i>/<b> inline tags.
+
     Returns:
-        List of text strings
+        List of markup-annotated text strings
     """
     texts = []
     for paragraph in paragraphs:
-        if paragraph.text.strip():
-            texts.append(paragraph.text)
-        else:
+        if not paragraph.text.strip():
             texts.append("")
+            continue
+        marked = ""
+        for run in paragraph.runs:
+            t = run.text
+            if not t:
+                continue
+            if run.italic:
+                t = f"<i>{t}</i>"
+            elif run.bold:
+                t = f"<b>{t}</b>"
+            marked += t
+        texts.append(marked if marked else paragraph.text)
     return texts
 
 
 def apply_translations_to_paragraphs(paragraphs, translations: List[str]):
     """
-    Apply translations to paragraphs while preserving formatting.
-    
+    Apply translations to paragraphs, reconstructing per-run italic/bold from inline markup.
+
     Args:
         paragraphs: List of paragraph objects
-        translations: List of translated texts
+        translations: List of translated texts (may contain <i>/<b> inline markup)
     """
     for paragraph, translation in zip(paragraphs, translations):
         if not translation.strip():
             continue
-            
-        # Store original formatting from first meaningful run
-        original_formatting = None
-        print(f"paragraph.runs = {paragraph.runs}")
+
+        # Capture base formatting from first meaningful run
+        base_fmt = None
         for run in paragraph.runs:
-            print(f"run = {run}")
             if run.text.strip():
-                print(f"run.text.strip() = {run.text.strip()}")
-                original_formatting = {
+                base_fmt = {
                     'bold': run.bold,
                     'italic': run.italic,
                     'underline': run.underline,
@@ -147,66 +190,49 @@ def apply_translations_to_paragraphs(paragraphs, translations: List[str]):
                     'highlight_color': run.font.highlight_color,
                     'style': run.style
                 }
-                print(f"original_formatting = {original_formatting}")
                 break
-        
-        # Clear existing runs
+
+        # Clear existing runs and keep just one
         for run in paragraph.runs:
             run.clear()
-        
-        # Remove all runs except the first one
         while len(paragraph.runs) > 1:
             paragraph._element.remove(paragraph.runs[-1]._element)
-        
-        # Apply translation to first run
+
+        # Parse inline markup and rebuild runs
+        segments = _parse_inline_markup(translation) or [(translation, {})]
+
         if paragraph.runs:
-            first_run = paragraph.runs[0]
-            first_run.text = translation
-            
-            # Apply original formatting
-            if original_formatting:
-                if original_formatting['bold'] is not None:
-                    first_run.bold = original_formatting['bold']
-                if original_formatting['italic'] is not None:
-                    first_run.italic = original_formatting['italic']
-                if original_formatting['underline'] is not None:
-                    first_run.underline = original_formatting['underline']
-                if original_formatting['font_name']:
-                    first_run.font.name = original_formatting['font_name']
-                if original_formatting['font_size']:
-                    first_run.font.size = original_formatting['font_size']
-                if original_formatting['font_color']:
-                    first_run.font.color.rgb = original_formatting['font_color']
-                if original_formatting['highlight_color']:
-                    first_run.font.highlight_color = original_formatting['highlight_color']
-                if original_formatting['style']:
-                    first_run.style = original_formatting['style']
+            first_text, first_fmt = segments[0]
+            paragraph.runs[0].text = first_text
+            _apply_run_formatting(paragraph.runs[0], base_fmt, first_fmt)
+            for text, seg_fmt in segments[1:]:
+                _apply_run_formatting(paragraph.add_run(text), base_fmt, seg_fmt)
 
 
 def translate_table_cells(client: AzureOpenAI, model: str, table, target_language: str):
     """
     Translate all text in table cells using batch processing.
-    
+
     Args:
         table: python-docx table object
     """
     all_paragraphs = []
-    
+
     # Collect all paragraphs from all cells
     for row in table.rows:
         for cell in row.cells:
             all_paragraphs.extend(cell.paragraphs)
-    
+
     if not all_paragraphs:
         return
-    
+
     # Collect texts and translate in batches
     texts = collect_paragraph_texts(all_paragraphs)
-    
+
     # Process in batches of 20 to avoid token limits
     batch_size = 20
     translated_texts = []
-    
+
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
         batch_translations = translate_text_batch(client=client,
@@ -214,11 +240,11 @@ def translate_table_cells(client: AzureOpenAI, model: str, table, target_languag
                                                   texts=batch,
                                                   target_language=target_language)
         translated_texts.extend(batch_translations)
-        
+
         # Small delay between batches to avoid rate limiting
         if i + batch_size < len(texts):
             time.sleep(0.5)
-    
+
     # Apply translations
     apply_translations_to_paragraphs(all_paragraphs, translated_texts)
 
@@ -231,7 +257,7 @@ def translate_docx_document(client: AzureOpenAI,
                             output_format: str) -> bool:
     """
     Translate an entire DOCX document while preserving formatting.
-    
+
     Args:
         client: Azure OpenAI client
         model: chosen Azure OpenAI model deployment
@@ -248,15 +274,15 @@ def translate_docx_document(client: AzureOpenAI,
         output_file_path = os.path.join(output_folder, target_language + "_" + file_name)
         # Load the document
         doc = Document(input_path)
-        
+
         # Translate main document paragraphs
         if doc.paragraphs:
             texts = collect_paragraph_texts(doc.paragraphs)
-            
+
             # Process in batches
             batch_size = 20
             translated_texts = []
-            
+
             for i in range(0, len(texts), batch_size):
                 batch = texts[i:i + batch_size]
                 print(f"Processing batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}")
@@ -265,13 +291,13 @@ def translate_docx_document(client: AzureOpenAI,
                                                           texts=batch,
                                                           target_language=target_language)
                 translated_texts.extend(batch_translations)
-                
+
                 # Small delay between batches
                 if i + batch_size < len(texts):
                     time.sleep(0.5)
-            
+
             apply_translations_to_paragraphs(doc.paragraphs, translated_texts)
-        
+
         # Translate tables
         if doc.tables:
             print("Translating tables...")
@@ -281,12 +307,12 @@ def translate_docx_document(client: AzureOpenAI,
                                       model=model,
                                       table=table,
                                       target_language=target_language)
-        
+
         # Translate headers and footers
         print("Translating headers and footers...")
         for section_idx, section in enumerate(doc.sections):
             print(f"Processing section {section_idx+1}/{len(doc.sections)}")
-            
+
             # Translate header
             if section.header and section.header.paragraphs:
                 header_texts = collect_paragraph_texts(section.header.paragraphs)
@@ -295,14 +321,14 @@ def translate_docx_document(client: AzureOpenAI,
                                                            texts=header_texts,
                                                            target_language=target_language)
                 apply_translations_to_paragraphs(section.header.paragraphs, header_translations)
-                
+
                 # Translate header tables
                 for table in section.header.tables:
                     translate_table_cells(client=client,
                                           model=model,
                                           table=table,
                                           target_language=target_language)
-            
+
             # Translate footer
             if section.footer and section.footer.paragraphs:
                 footer_texts = collect_paragraph_texts(section.footer.paragraphs)
@@ -311,14 +337,14 @@ def translate_docx_document(client: AzureOpenAI,
                                                            texts=footer_texts,
                                                            target_language=target_language)
                 apply_translations_to_paragraphs(section.footer.paragraphs, footer_translations)
-                
+
                 # Translate footer tables
                 for table in section.footer.tables:
                     translate_table_cells(client=client,
                                           model=model,
                                           table=table,
                                           target_language=target_language)
-        
+
         # if indicated, save as pdf file
         if output_format == "Save as PDF":
             pdf_file_name = os.path.splitext(file_name)[0] + ".pdf"
@@ -342,7 +368,7 @@ def translate_docx_document(client: AzureOpenAI,
             doc.save(output_file_path)
 
         return True
-        
+
     except Exception as e:
         print(f"Error processing document: {e}")
         import traceback
