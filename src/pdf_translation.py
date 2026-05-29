@@ -38,7 +38,7 @@ def translate_text(client: AzureOpenAI, model: str, text: str, target_language: 
                     {"role": "system", "content": "You are a professional translator. Translate accurately while preserving formatting and context."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=4000,
+                max_completion_tokens=4000,
                 temperature=0
             )
             

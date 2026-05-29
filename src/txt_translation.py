@@ -168,7 +168,7 @@ def translate_text_batch(client: AzureOpenAI, deployment_name: str, texts: List[
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=4000,
+            max_completion_tokens=4000,
             temperature=0
         )
         

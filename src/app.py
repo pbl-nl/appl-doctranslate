@@ -195,5 +195,6 @@ if __name__ == "__main__":
         share=False,
         debug=True,
         server_name="127.0.0.1",
-        server_port=7860
+        server_port=7860,
+        inbrowser=True
     )
