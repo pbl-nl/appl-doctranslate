@@ -62,7 +62,7 @@ Texts to translate:
                 {"role": "system", "content": "You are a professional translator. Translate accurately while preserving formatting and meaning. Keep any inline <i>...</i> and <b>...</b> markup tags in place around the translated words."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=4000,
+            max_completion_tokens=4000,
             temperature=0
         )
 
