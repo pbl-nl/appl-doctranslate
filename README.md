@@ -6,3 +6,5 @@ Currently, translation is executed by an OpenAI LLM of choice, depending on the 
 
 The Gradio package is used to create a simple and user friendly interface, see below:
 
+<img width="1553" height="1343" alt="image003" src="https://github.com/user-attachments/assets/68af1e3c-3ac9-4790-b72b-f3672e3ea801" />
+
